@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
+	"os"
 	"time"
 )
 
@@ -17,7 +19,8 @@ func main() {
 		panic(fmt.Sprintf("invalid timeout flag %s: %s", *timeoutRaw, err.Error()))
 	}
 
-	daemon, err := NewZKDaemon(*zkAddr, *zkPath, timeout)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	daemon, err := NewZKDaemon(*zkAddr, *zkPath, logger, timeout)
 	if err != nil {
 		panic(fmt.Sprintf("cannot get new daemon: %s", timeoutRaw, err.Error()))
 	}

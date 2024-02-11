@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/go-zookeeper/zk"
 )
@@ -16,9 +17,10 @@ type ZKWatcher struct {
 	zkPath  string
 	content []byte
 	watcher <-chan zk.Event
+	logger  *slog.Logger
 }
 
-func NewZKWatcher(conn *zk.Conn, zkPath string) (*ZKWatcher, error) {
+func NewZKWatcher(conn *zk.Conn, zkPath string, logger *slog.Logger) (*ZKWatcher, error) {
 	content, _, watcher, err := conn.GetW(zkPath)
 	if err != nil {
 		return nil, err
@@ -37,6 +39,7 @@ func (watcher *ZKWatcher) Watch() {
 		case event := <-watcher.watcher:
 			err := watcher.setNewWatcher(event)
 			if err != nil {
+				watcher.logger.Error(err.Error())
 				continue
 			}
 		}

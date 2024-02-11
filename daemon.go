@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log/slog"
 	"strings"
 	"time"
 
@@ -21,42 +22,51 @@ type ZKDaemon struct {
 	cmdWatcher     Watcher
 }
 
-func NewZKDaemon(zkServersRaw, zkRoot string, timeout time.Duration) (*ZKDaemon, error) {
+func NewZKDaemon(zkServersRaw, zkRoot string, logger *slog.Logger, timeout time.Duration) (*ZKDaemon, error) {
 	zkServers := strings.Split(zkServersRaw, ",")
 	conn, _, err := zk.Connect(zkServers, timeout)
 	if err != nil {
 		return nil, err
 	}
 
-	versionWatcher, err := NewZKWatcher(conn, zkRoot+"/version")
+	copyWatcher, err := NewZKWatcher(conn, zkRoot+"/run", logger)
 	if err != nil {
 		return nil, err
 	}
 
-	copyWatcher, err := NewZKWatcher(conn, zkRoot+"/run")
+	runWatcher, err := NewZKWatcher(conn, zkRoot+"/run", logger)
 	if err != nil {
 		return nil, err
 	}
 
-	runWatcher, err := NewZKWatcher(conn, zkRoot+"/run")
+	cmdWatcher, err := NewZKWatcher(conn, zkRoot+"/cmd", logger)
 	if err != nil {
 		return nil, err
 	}
 
-	cmdWatcher, err := NewZKWatcher(conn, zkRoot+"/cmd")
+	ret := &ZKDaemon{
+		zkConn:      conn,
+		zkRoot:      zkRoot,
+		copyWatcher: copyWatcher,
+		runWatcher:  runWatcher,
+		cmdWatcher:  cmdWatcher,
+	}
+	versionWatcher, err := NewZKWatcher(conn, zkRoot+"/version", logger)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ZKDaemon{
-		zkConn:         conn,
-		zkRoot:         zkRoot,
-		versionWatcher: versionWatcher,
-		copyWatcher:    copyWatcher,
-		runWatcher:     runWatcher,
-		cmdWatcher:     cmdWatcher,
-	}, nil
+	ret.versionWatcher = versionWatcher
+	return ret, nil
 }
 
 func (daemon *ZKDaemon) Run() {
+	go daemon.versionWatcher.Watch()
+	go daemon.copyWatcher.Watch()
+	go daemon.runWatcher.Watch()
+	go daemon.cmdWatcher.Watch()
+}
+
+func (daemon *ZKDaemon) Deploy() error {
+	return nil
 }
