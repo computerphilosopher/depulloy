@@ -30,6 +30,7 @@ func NewZKWatcher(conn *zk.Conn, zkPath string, logger *slog.Logger) (*ZKWatcher
 		zkPath:  zkPath,
 		content: content,
 		watcher: watcher,
+		logger:  logger,
 	}, nil
 }
 
