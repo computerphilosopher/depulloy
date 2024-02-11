@@ -1,14 +1,17 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/go-zookeeper/zk"
 )
 
-type Daemon struct {
+type Daemon interface {
+	Run()
+}
+
+type ZKDaemon struct {
 	zkConn *zk.Conn
 	zkRoot string
 
@@ -18,11 +21,7 @@ type Daemon struct {
 	cmdWatcher     Watcher
 }
 
-func (daemon *Daemon) getPath(terminalNode string) string {
-	return fmt.Sprintf("%s/%s", daemon.zkRoot, terminalNode)
-}
-
-func NewDaemon(zkServersRaw, zkRoot string, timeout time.Duration) (*Daemon, error) {
+func NewZKDaemon(zkServersRaw, zkRoot string, timeout time.Duration) (*ZKDaemon, error) {
 	zkServers := strings.Split(zkServersRaw, ",")
 	conn, _, err := zk.Connect(zkServers, timeout)
 	if err != nil {
@@ -49,7 +48,7 @@ func NewDaemon(zkServersRaw, zkRoot string, timeout time.Duration) (*Daemon, err
 		return nil, err
 	}
 
-	return &Daemon{
+	return &ZKDaemon{
 		zkConn:         conn,
 		zkRoot:         zkRoot,
 		versionWatcher: versionWatcher,
@@ -59,5 +58,5 @@ func NewDaemon(zkServersRaw, zkRoot string, timeout time.Duration) (*Daemon, err
 	}, nil
 }
 
-func (daemon *Daemon) Run() {
+func (daemon *ZKDaemon) Run() {
 }

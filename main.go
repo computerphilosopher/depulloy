@@ -17,7 +17,7 @@ func main() {
 		panic(fmt.Sprintf("invalid timeout flag %s: %s", *timeoutRaw, err.Error()))
 	}
 
-	daemon, err := NewDaemon(*zkAddr, *zkPath, timeout)
+	daemon, err := NewZKDaemon(*zkAddr, *zkPath, timeout)
 	if err != nil {
 		panic(fmt.Sprintf("cannot get new daemon: %s", timeoutRaw, err.Error()))
 	}
