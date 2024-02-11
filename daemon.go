@@ -29,7 +29,7 @@ func NewZKDaemon(zkServersRaw, zkRoot string, logger *slog.Logger, timeout time.
 		return nil, err
 	}
 
-	copyWatcher, err := NewZKWatcher(conn, zkRoot+"/run", logger)
+	copyWatcher, err := NewZKWatcher(conn, zkRoot+"/copy", logger)
 	if err != nil {
 		return nil, err
 	}
