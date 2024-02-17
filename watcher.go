@@ -3,64 +3,67 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/go-zookeeper/zk"
 )
 
-// TODO: MySQL, Postgres Watcher
-type Watcher interface {
-	Watch()
-}
-
 type ZKWatcher struct {
-	conn    *zk.Conn
-	zkPath  string
-	content []byte
-	watcher <-chan zk.Event
-	logger  *slog.Logger
+	znode     *ZKNode
+	eventChan <-chan zk.Event
+	logger    *slog.Logger
 }
 
-func NewZKWatcher(conn *zk.Conn, zkPath string, logger *slog.Logger) (*ZKWatcher, error) {
-	content, _, watcher, err := conn.GetW(zkPath)
+func NewZKWatcher(znode *ZKNode, logger *slog.Logger) (*ZKWatcher, error) {
+	watcher, err := znode.GetW()
 	if err != nil {
 		return nil, err
 	}
 	return &ZKWatcher{
-		conn:    conn,
-		zkPath:  zkPath,
-		content: content,
-		watcher: watcher,
-		logger:  logger,
+		znode:     znode,
+		eventChan: watcher,
+		logger:    logger,
 	}, nil
+}
+
+func (watcher *ZKWatcher) handleEvent(event zk.Event) error {
+	if event.Type != zk.EventNodeDataChanged {
+		return fmt.Errorf("event is %s", event.Type.String())
+	}
+
+	eventChan, err := watcher.znode.GetW()
+	if err != nil {
+		return err
+	}
+	watcher.eventChan = eventChan
+
+	return nil
 }
 
 func (watcher *ZKWatcher) Watch() {
 	for {
 		select {
-		case event := <-watcher.watcher:
-			err := watcher.setNewWatcher(event)
+		case event := <-watcher.eventChan:
+			err := watcher.handleEvent(event)
 			if err != nil {
 				watcher.logger.Error(err.Error())
-				continue
 			}
 		}
 	}
 }
 
-func (watcher *ZKWatcher) setNewWatcher(event zk.Event) error {
-	newContent, _, newWatcher, err := watcher.conn.GetW(watcher.zkPath)
-	if err != nil {
-		watcher.content = nil
-		watcher.watcher = nil
-		return err
+func (watcher *ZKWatcher) WatchWithRetry() {
+	for {
+		select {
+		case event := <-watcher.eventChan:
+			for {
+				err := watcher.handleEvent(event)
+				if err == nil {
+					break
+				}
+				watcher.logger.Error(err.Error())
+				time.Sleep(time.Second * 5)
+			}
+		}
 	}
-
-	watcher.content = newContent
-	watcher.watcher = newWatcher
-
-	if event.Type != zk.EventNodeDataChanged {
-		return fmt.Errorf("event is %s", event.Type.String())
-	}
-
-	return nil
 }

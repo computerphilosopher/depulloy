@@ -26,4 +26,6 @@ func main() {
 	}
 
 	daemon.Run()
+
+	select {}
 }

@@ -15,11 +15,12 @@ type Daemon interface {
 type ZKDaemon struct {
 	zkConn *zk.Conn
 	zkRoot string
+	logger *slog.Logger
 
-	versionWatcher Watcher
-	copyWatcher    Watcher
-	runWatcher     Watcher
-	cmdWatcher     Watcher
+	versionWatcher *ZKWatcher
+	copyWatcher    *ZKWatcher
+	envWatcher     *ZKWatcher
+	runWatcher     *ZKWatcher
 }
 
 func NewZKDaemon(zkServersRaw, zkRoot string, logger *slog.Logger, timeout time.Duration) (*ZKDaemon, error) {
@@ -29,17 +30,17 @@ func NewZKDaemon(zkServersRaw, zkRoot string, logger *slog.Logger, timeout time.
 		return nil, err
 	}
 
-	copyWatcher, err := NewZKWatcher(conn, zkRoot+"/copy", logger)
+	copyWatcher, err := NewZKWatcher(NewZKNode(conn, zkRoot+"/copy"), logger)
 	if err != nil {
 		return nil, err
 	}
 
-	runWatcher, err := NewZKWatcher(conn, zkRoot+"/run", logger)
+	envWatcher, err := NewZKWatcher(NewZKNode(conn, zkRoot+"/env"), logger)
 	if err != nil {
 		return nil, err
 	}
 
-	cmdWatcher, err := NewZKWatcher(conn, zkRoot+"/cmd", logger)
+	runWatcher, err := NewZKWatcher(NewZKNode(conn, zkRoot+"/run"), logger)
 	if err != nil {
 		return nil, err
 	}
@@ -47,11 +48,12 @@ func NewZKDaemon(zkServersRaw, zkRoot string, logger *slog.Logger, timeout time.
 	ret := &ZKDaemon{
 		zkConn:      conn,
 		zkRoot:      zkRoot,
+		logger:      logger,
 		copyWatcher: copyWatcher,
+		envWatcher:  envWatcher,
 		runWatcher:  runWatcher,
-		cmdWatcher:  cmdWatcher,
 	}
-	versionWatcher, err := NewZKWatcher(conn, zkRoot+"/version", logger)
+	versionWatcher, err := NewZKWatcher(NewZKNode(conn, zkRoot+"/version"), logger)
 	if err != nil {
 		return nil, err
 	}
@@ -61,10 +63,10 @@ func NewZKDaemon(zkServersRaw, zkRoot string, logger *slog.Logger, timeout time.
 }
 
 func (daemon *ZKDaemon) Run() {
-	go daemon.versionWatcher.Watch()
 	go daemon.copyWatcher.Watch()
+	go daemon.envWatcher.Watch()
 	go daemon.runWatcher.Watch()
-	go daemon.cmdWatcher.Watch()
+	go daemon.versionWatcher.WatchWithRetry()
 }
 
 func (daemon *ZKDaemon) Deploy() error {
